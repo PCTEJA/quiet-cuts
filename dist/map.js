@@ -27,10 +27,10 @@ export async function createMap(element, { onSelect = () => {}, onStats = () => 
   let wanted=new Map();
   const paints={};
   for(const [name,rgba,stroke] of [
-    ['land',[0.14,0.22,0.28,1]], ['study',[0.23,0.37,0.40,1]],
-    ['CA',[0.12,0.31,0.33,1]], ['WA',[0.12,0.31,0.33,1]], ['NY',[0.12,0.31,0.33,1]],
-    ['border',[0.4,0.53,0.57,0.53],true], ['county',[0.43,0.55,0.58,0.28],true],
-    ['dot',[1,0.45,0.35,0.92]], ['halo',[1,0.45,0.35,0.13]], ['ring',[1,0.88,0.68,1],true]
+    ['land',[0.93,0.96,0.99,1]], ['study',[0.85,0.92,1,1]],
+    ['CA',[0.86,0.92,1,1]], ['WA',[0.86,0.92,1,1]], ['NY',[0.86,0.92,1,1]],
+    ['border',[0.60,0.74,0.91,0.85],true], ['county',[0.60,0.74,0.91,0.4],true],
+    ['selected',[0.70,0.13,0.20,1]], ['dot',[0.10,0.49,1,0.7]], ['halo',[0.24,0.61,1,0.13]], ['ring',[1,1,1,1],true]
   ]) { const p=new CK.Paint(); p.setColor(CK.Color4f(...rgba)); p.setAntiAlias(true); if(stroke) {p.setStyle(CK.PaintStyle.Stroke);p.setStrokeWidth(1);} paints[name]=p; }
   element.tabIndex=0;
   element.setAttribute('role','img');
@@ -43,17 +43,17 @@ export async function createMap(element, { onSelect = () => {}, onStats = () => 
   function updateRegions() {
     regionTotals={CA:0,WA:0,NY:0};
     for(const e of events)if(Object.hasOwn(regionTotals,e.state)&&Number.isFinite(+e.workers))regionTotals[e.state]+=Math.max(0,+e.workers);
-    const max=Math.max(...Object.values(regionTotals),1),low=[.22,.61,.59],high=[1,.45,.35];
+    const max=Math.max(...Object.values(regionTotals),1),low=[.78,.88,1],high=[.03,.32,.85];
     for(const state of Object.keys(regionTotals)) {
       const amount=regionTotals[state],t=amount/max;
-      const rgb=amount>0?low.map((value,i)=>value+(high[i]-value)*t):[.12,.31,.33];
+      const rgb=amount>0?low.map((value,i)=>value+(high[i]-value)*t):[.86,.92,1];
       paints[state].setColor(CK.Color4f(...rgb,1));
     }
     updateDescription();
   }
   function updateDescription() {
     const totals=Object.entries(regionTotals).map(([s,n])=>`${s}: ${n.toLocaleString()} workers in selected records`).join('; ');
-    element.title=mode==='regions'?`${totals}. Color is relative to this filtered sample. Dark teal means zero selected workers; slate means outside the study. County lines provide geographic context only.`:'Drag to pan; scroll to zoom. Select a circle to inspect a record.';
+    element.title=mode==='regions'?`${totals}. Color is relative to this filtered sample. Pale blue means zero selected workers; gray means outside the study. County lines provide geographic context only.`:'Drag to pan; scroll to zoom. Select a circle to inspect a record.';
     element.setAttribute('aria-label',`Interactive layoff map. ${mode==='regions'?`State totals for selected records. ${totals}.`:'Event markers for selected records.'} Arrow keys pan; plus and minus zoom; Home resets. Select individual records in the accessible event list.`);
   }
   function schedule() { if(!destroyed&&!frame) frame=requestAnimationFrame(draw); }
@@ -104,7 +104,7 @@ export async function createMap(element, { onSelect = () => {}, onStats = () => 
     frame=0;if(destroyed||!surface)return;
     wanted=visible();fetchTiles();evict();
     const c=surface.getCanvas(),scale=extent();
-    c.clear(CK.Color4f(0.055,0.12,0.16,1));c.save();c.scale(dpr,dpr);rendered=0;
+    c.clear(CK.Color4f(1,1,1,1));c.save();c.scale(dpr,dpr);rendered=0;
     for(const [key,t] of wanted) {
       const tile=cache.get(key);if(!tile)continue;
       cache.delete(key);cache.set(key,tile);rendered++;
@@ -123,7 +123,7 @@ export async function createMap(element, { onSelect = () => {}, onStats = () => 
       const p=project(+e.lon,+e.lat),x=(p[0]-center[0])*scale+width/2,y=(p[1]-center[1])*scale+height/2;
       if(x< -30||x>width+30||y< -30||y>height+30)continue;
       const r=Math.max(4,Math.min(19,3+Math.sqrt(+e.workers||0)*.24));
-      c.drawCircle(x,y,r+5,paints.halo);c.drawCircle(x,y,r,paints.dot);
+      c.drawCircle(x,y,r+5,paints.halo);c.drawCircle(x,y,r,e.id===selected?paints.selected:paints.dot);paints.ring.setStrokeWidth(1);c.drawCircle(x,y,r,paints.ring);
       if(e.id===selected){paints.ring.setStrokeWidth(2);c.drawCircle(x,y,r+3,paints.ring);}
       hit.push({x,y,r:Math.max(r,12),event:e});
     }
