@@ -26,6 +26,25 @@ export async function createMap(element, { onSelect = () => {}, onStats = () => 
   const cache=new Map(), active=new Map(), missing=new Set();
   let wanted=new Map();
   const paints={};
+  const tooltip=document.createElement('div');
+  tooltip.className='map-city-tooltip';tooltip.hidden=true;tooltip.setAttribute('role','tooltip');
+  element.parentElement.append(tooltip);
+  const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const date=value=>{const d=new Date(`${value}T00:00:00Z`);return Number.isNaN(d.getTime())?'Not available':d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',timeZone:'UTC'});};
+  const hideTooltip=()=>{tooltip.hidden=true;};
+  function markerAt(x,y){return hit.filter(p=>Math.hypot(p.x-x,p.y-y)<=p.r).sort((a,b)=>Math.hypot(a.x-x,a.y-y)-Math.hypot(b.x-x,b.y-y))[0];}
+  function showTooltip(mark){
+    if(!mark){hideTooltip();element.style.cursor='grab';return;}
+    const e=mark.event;
+    tooltip.innerHTML=`<div class="map-city-eyebrow">${e.synthetic?'Illustrative record':'WARN record'} · ${escape(e.state)}</div><strong class="map-city-name">${escape(e.city||e.county||'Location unspecified')}</strong><div class="map-city-company">${escape(e.company||'Employer unspecified')}</div><div class="map-city-workers"><strong>${Number.isFinite(+e.workers)?Math.max(0,+e.workers).toLocaleString():'—'}</strong><span>affected workers</span></div><dl><div><dt>Industry</dt><dd>${escape(e.industry||'Not specified')}</dd></div><div><dt>Notice date</dt><dd>${escape(e.noticeDate?date(e.noticeDate):'Not available')}</dd></div><div><dt>Effective date</dt><dd>${escape(e.effectiveDate?date(e.effectiveDate):'Not available')}</dd></div></dl><div class="map-city-hint">Click dot to explore evidence ↗</div>`;
+    tooltip.hidden=false;
+    const parent=element.parentElement.getBoundingClientRect(),canvas=element.getBoundingClientRect();
+    const x=canvas.left-parent.left+mark.x,y=canvas.top-parent.top+mark.y;
+    const tw=tooltip.offsetWidth,th=tooltip.offsetHeight;
+    tooltip.style.left=`${Math.max(8,Math.min(parent.width-tw-8,x+18+tw>parent.width?x-tw-18:x+18))}px`;
+    tooltip.style.top=`${Math.max(8,Math.min(parent.height-th-8,y-th/2))}px`;
+    element.style.cursor='pointer';
+  }
   for(const [name,rgba,stroke] of [
     ['land',[0.93,0.96,0.99,1]], ['study',[0.85,0.92,1,1]],
     ['CA',[0.86,0.92,1,1]], ['WA',[0.86,0.92,1,1]], ['NY',[0.86,0.92,1,1]],
@@ -56,7 +75,7 @@ export async function createMap(element, { onSelect = () => {}, onStats = () => 
     element.title=mode==='regions'?`${totals}. Color is relative to this filtered sample. Pale blue means zero selected workers; gray means outside the study. County lines provide geographic context only.`:'Drag to pan; scroll to zoom. Select a circle to inspect a record.';
     element.setAttribute('aria-label',`Interactive layoff map. ${mode==='regions'?`State totals for selected records. ${totals}.`:'Event markers for selected records.'} Arrow keys pan; plus and minus zoom; Home resets. Select individual records in the accessible event list.`);
   }
-  function schedule() { if(!destroyed&&!frame) frame=requestAnimationFrame(draw); }
+  function schedule() { hideTooltip();if(!destroyed&&!frame) frame=requestAnimationFrame(draw); }
   function tilePaths(data) {
     const output=[];
     try {
@@ -152,7 +171,9 @@ export async function createMap(element, { onSelect = () => {}, onStats = () => 
   function listen(type,fn,options){element.addEventListener(type,fn,options);listeners.push([type,fn,options]);}
   listen('wheel',e=>{e.preventDefault();const r=element.getBoundingClientRect();zoomBy(-Math.sign(e.deltaY)*.35,e.clientX-r.left,e.clientY-r.top);},{passive:false});
   listen('pointerdown',e=>{element.focus({preventScroll:true});element.setPointerCapture(e.pointerId);drag={x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,moved:false};element.style.cursor='grabbing';});
-  listen('pointermove',e=>{if(!drag)return;const s=extent();center[0]-=(e.clientX-drag.x)/s;center[1]=Math.max(.03,Math.min(.95,center[1]-(e.clientY-drag.y)/s));center[0]=Math.max(0,Math.min(1,center[0]));drag.moved ||= Math.hypot(e.clientX-drag.startX,e.clientY-drag.startY)>5;drag.x=e.clientX;drag.y=e.clientY;schedule();});
+  listen('pointermove',e=>{if(!drag){const r=element.getBoundingClientRect();showTooltip(markerAt(e.clientX-r.left,e.clientY-r.top));return;}const s=extent();center[0]-=(e.clientX-drag.x)/s;center[1]=Math.max(.03,Math.min(.95,center[1]-(e.clientY-drag.y)/s));center[0]=Math.max(0,Math.min(1,center[0]));drag.moved ||= Math.hypot(e.clientX-drag.startX,e.clientY-drag.startY)>5;drag.x=e.clientX;drag.y=e.clientY;schedule();});
+  listen('pointerleave',hideTooltip);
+  listen('blur',hideTooltip);
   listen('pointerup',e=>{if(drag&&!drag.moved){const r=element.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;const mark=hit.filter(p=>Math.hypot(p.x-x,p.y-y)<=p.r).sort((a,b)=>Math.hypot(a.x-x,a.y-y)-Math.hypot(b.x-x,b.y-y))[0];if(mark){selected=mark.event.id;onSelect(selected);schedule();}}drag=null;element.style.cursor='grab';});
   listen('pointercancel',()=>{drag=null;element.style.cursor='grab';});
   listen('keydown',e=>{const delta={ArrowLeft:[-80,0],ArrowRight:[80,0],ArrowUp:[0,-80],ArrowDown:[0,80]}[e.key];if(delta){e.preventDefault();center[0]+=delta[0]/extent();center[1]+=delta[1]/extent();schedule();}else if(['+','=','-','Home'].includes(e.key)){e.preventDefault();if(e.key==='Home')fit();else zoomBy(e.key==='-'?-.5:.5);}});
@@ -162,6 +183,6 @@ export async function createMap(element, { onSelect = () => {}, onStats = () => 
     // setMode('regions') shades CA/WA/NY by filtered workers; 'events' restores markers.
     setMode(next){mode=next==='regions'?'regions':'events';updateDescription();schedule();},
     select(id){selected=id;schedule();},
-    destroy(){destroyed=true;observer.disconnect();cancelAnimationFrame(frame);active.forEach(c=>c.abort());active.clear();for(const key of [...cache.keys()])removeTile(key);Object.values(paints).forEach(p=>p.delete());surface?.dispose();listeners.forEach(([t,f,o])=>element.removeEventListener(t,f,o));}
+    destroy(){destroyed=true;tooltip.remove();observer.disconnect();cancelAnimationFrame(frame);active.forEach(c=>c.abort());active.clear();for(const key of [...cache.keys()])removeTile(key);Object.values(paints).forEach(p=>p.delete());surface?.dispose();listeners.forEach(([t,f,o])=>element.removeEventListener(t,f,o));}
   };
 }
