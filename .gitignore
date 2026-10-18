@@ -1,0 +1,6 @@
+tools-map/node_modules/
+node_modules/
+*.tar.gz
+*.tar
+.openai/*.local.*
+tmp/

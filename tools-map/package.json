@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "canvaskit-wasm": "^0.40.0",
+    "geojson-vt": "^4.0.2",
+    "topojson-client": "^3.1.0",
+    "us-atlas": "^3.0.1"
+  }
+}
