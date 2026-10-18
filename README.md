@@ -19,7 +19,7 @@ The proposal's nationwide trend/heatmap, salary comparison, and AI/non-AI illust
 
 ## Reproduce data and tiles
 
-`python scripts/data_build.py` recreates the original dataset from preserved agency/Census snapshots. For current data, use `python scripts/refresh_data.py`: it downloads into a temporary staging directory, validates all three sources, then updates source and deployable JSON together. Failed collection leaves the prior snapshot intact. Census geometry is pinned to the preserved 2026 files.
+`python scripts/data_build.py` recreates the original dataset from preserved agency/Census snapshots. Current collection runs in the separate `quiet-cuts-data` repository and publishes to Supabase. The old local refresh script is retained for baseline reproduction only. Census geometry is pinned to the preserved 2026 files.
 
 The map's separate development dependencies live in `tools-map/`. See its manifest and `scripts/build-tiles.mjs` to rebuild static tiles from US Atlas. Browser delivery requires no Node package installation. WASM and all map tiles are local assets; the Google Fonts stylesheet is optional and system fonts provide a fallback.
 
@@ -31,12 +31,14 @@ Viewport-only tiles, at most 32 cached tiles / 8 MiB estimated serialized geomet
 
 Automated checks cover missing evidence, QCI denominator exclusions, negative and boundary delays, independent receipt baselines, prospective interval ranges, regional sensitivity, fictional-data separation, import validation, and official source totals. UI review covers map rendering, zoomed county detail, filters, evidence drawers, and synthetic study charts.
 
-## Hourly collection and Netlify deployment
+## Independent data API and monthly history
 
-GitHub Actions (`.github/workflows/refresh.yml`) checks the three official sources at minute 17 of every hour, on pushes to `main`, and on manual dispatch. Schedules may be delayed or skipped by GitHub; this is not a guaranteed exact hourly service. The workflow tests source completeness, schema, counts, dates, coordinates, and evidence boundaries. A state losing over 30% of its records fails for review (including legitimate fiscal rollovers). Failed downloads or tests prevent publication.
+Hourly collection now runs in the private [quiet-cuts-data repository](https://github.com/PCTEJA/quiet-cuts-data). It validates agency sources and stores changed snapshots plus successful check observations in the dedicated free-tier Supabase project. Data updates do not trigger website deployments.
 
-Validated changes are committed to Git for source history. The workflow deploys `dist/` directly through Netlify's API using repository secrets `NETLIFY_AUTH_TOKEN` and `NETLIFY_SITE_ID`. No Netlify Git build hook is required. Only changed assets trigger deployment; an unchanged hourly check does not consume another production deployment. A failed deployment is retried on the next run because published and local asset hashes are compared. Deployments remain subject to account quotas.
+The website reads the API through `dist/data-client.js` on startup and every five minutes. The Source Snapshot selector opens the last captured observation in an available UTC month. Missing months remain unavailable. Failed polling retains displayed data; startup outages use a clearly labeled bundled baseline.
 
-The dashboard displays the retrieval date of its published snapshot. Unchanged checks retain that date; each check's precise timestamp and outcome are in GitHub Actions logs. News searching is not automated, no original posting time is claimed, and coverage remains CA current fiscal report / NY default export / WA first page. The initial counts above document the October 17 sample and may differ after updates.
+History begins with the evidenced October 17, 2026 capture (Chicago time). Older record dates in that snapshot are not verified historical monthly captures or complete monthly totals. The collector preserves old versions even when agencies remove or correct rows. Source coverage remains CA current fiscal report, NY default export, and WA first page. See the data repository README for API endpoints, schema, provenance, and recovery instructions.
 
-Run `npm test` and `python -m unittest discover -s tests -p 'test_*.py'` for validation. Imports persist only for the current browser session. The repository is private; operator run history requires repository access.
+The website workflow `.github/workflows/deploy.yml` runs only for website code/configuration changes or manual dispatch. It tests and publishes `dist/` using the existing Netlify secrets. There is no hourly schedule or collection step in this repository. The bundled `data/` and `dist/data/` files are a fallback/reproduction baseline; the database is authoritative for live data.
+
+Run `npm test` for website and data-client checks. The collector repository owns collection validation and source backups. Both repositories are private; viewing Actions logs requires repository access.
