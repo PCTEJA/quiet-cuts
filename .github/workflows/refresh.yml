@@ -1,0 +1,52 @@
+name: Hourly source check and deploy
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+concurrency:
+  group: quiet-cuts-production
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download and validate agency sources
+        run: python scripts/refresh_data.py
+      - name: Verify calculations and data integrity
+        run: |
+          npm test
+          python -m unittest discover -s tests -p 'test_*.py'
+      - name: Preserve validated snapshots in Git
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data dist/data
+          if ! git diff --cached --quiet; then
+            git commit -m 'Refresh validated official WARN snapshot'
+            git push origin HEAD:main
+          fi
+          echo "DEPLOY_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Publish changed assets to Netlify
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: python scripts/deploy_netlify.py
+      - name: Check summary
+        if: always()
+        run: |
+          echo '## Hourly WARN source check' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Sources: California current fiscal report; New York default dashboard export; Washington first database page.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'A failed download, validation, or test prevents publication. Unchanged data does not trigger another Netlify deployment.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'News matching and original publication timestamps are not automatically verified.' >> "$GITHUB_STEP_SUMMARY"

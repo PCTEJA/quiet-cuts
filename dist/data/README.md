@@ -1,6 +1,6 @@
 # Official record snapshot
 
-Retrieved October 17, 2026. Run `python scripts/data_build.py` from the app root to reproduce `events.json` and `sources.json` from saved snapshots. The script uses the Python standard library. `--refresh` retrieves current sources and changes the sample; review changed schemas before interpreting updated results.
+The initial snapshot was retrieved October 17, 2026. Current retrieval times and counts are in events.json metadata. Automated collection now checks hourly through GitHub Actions; the coverage counts below describe the initial snapshot. Run `python scripts/data_build.py` from the app root to reproduce `events.json` and `sources.json` from saved snapshots. The script uses the Python standard library. `--refresh` retrieves current sources and changes the sample; review changed schemas before interpreting updated results.
 
 ## Coverage
 

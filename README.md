@@ -19,7 +19,7 @@ The proposal's nationwide trend/heatmap, salary comparison, and AI/non-AI illust
 
 ## Reproduce data and tiles
 
-`python scripts/data_build.py` recreates the dataset from preserved agency/Census snapshots. Copy updated `data/events.json` and `data/sources.json` into `dist/data/` after review. `--refresh` fetches new sources and can change the sample/schema.
+`python scripts/data_build.py` recreates the original dataset from preserved agency/Census snapshots. For current data, use `python scripts/refresh_data.py`: it downloads into a temporary staging directory, validates all three sources, then updates source and deployable JSON together. Failed collection leaves the prior snapshot intact. Census geometry is pinned to the preserved 2026 files.
 
 The map's separate development dependencies live in `tools-map/`. See its manifest and `scripts/build-tiles.mjs` to rebuild static tiles from US Atlas. Browser delivery requires no Node package installation. WASM and all map tiles are local assets; the Google Fonts stylesheet is optional and system fonts provide a fallback.
 
@@ -31,4 +31,12 @@ Viewport-only tiles, at most 32 cached tiles / 8 MiB estimated serialized geomet
 
 Automated checks cover missing evidence, QCI denominator exclusions, negative and boundary delays, independent receipt baselines, prospective interval ranges, regional sensitivity, fictional-data separation, import validation, and official source totals. UI review covers map rendering, zoomed county detail, filters, evidence drawers, and synthetic study charts.
 
-No continuous collection or external publication of findings is scheduled. The application serves a reproducible snapshot. Imports persist only for the current browser session.
+## Hourly collection and Netlify deployment
+
+GitHub Actions (`.github/workflows/refresh.yml`) checks the three official sources at minute 17 of every hour, on pushes to `main`, and on manual dispatch. Schedules may be delayed or skipped by GitHub; this is not a guaranteed exact hourly service. The workflow tests source completeness, schema, counts, dates, coordinates, and evidence boundaries. A state losing over 30% of its records fails for review (including legitimate fiscal rollovers). Failed downloads or tests prevent publication.
+
+Validated changes are committed to Git for source history. The workflow deploys `dist/` directly through Netlify's API using repository secrets `NETLIFY_AUTH_TOKEN` and `NETLIFY_SITE_ID`. No Netlify Git build hook is required. Only changed assets trigger deployment; an unchanged hourly check does not consume another production deployment. A failed deployment is retried on the next run because published and local asset hashes are compared. Deployments remain subject to account quotas.
+
+The dashboard displays the retrieval date of its published snapshot. Unchanged checks retain that date; each check's precise timestamp and outcome are in GitHub Actions logs. News searching is not automated, no original posting time is claimed, and coverage remains CA current fiscal report / NY default export / WA first page. The initial counts above document the October 17 sample and may differ after updates.
+
+Run `npm test` and `python -m unittest discover -s tests -p 'test_*.py'` for validation. Imports persist only for the current browser session. The repository is private; operator run history requires repository access.

@@ -3,4 +3,10 @@ node_modules/
 *.tar.gz
 *.tar
 .openai/*.local.*
+.openai/
 tmp/
+.netlify/
+.env
+.env.*
+__pycache__/
+*.pyc

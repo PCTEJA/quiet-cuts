@@ -6,11 +6,11 @@ No first-publication timestamp or news coverage is inferred from agency dates.
 """
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
-import csv, io, json, re, hashlib, zipfile, urllib.request, sys, html
+import csv, io, json, re, hashlib, zipfile, urllib.request, sys, html, os, time
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA = ROOT / 'data'
+DATA = Path(os.environ.get('QUIET_CUTS_DATA_DIR', ROOT / 'data'))
 SNAP = DATA / 'snapshots'
 SOURCES = {
     'ca.xlsx': 'https://edd.ca.gov/siteassets/files/jobs_and_training/warn/warn_report1.xlsx',
@@ -22,7 +22,18 @@ SOURCES = {
 SNAP.mkdir(parents=True, exist_ok=True)
 if '--refresh' in sys.argv:
     for filename, url in SOURCES.items():
-        data = urllib.request.urlopen(url, timeout=60).read()
+        # Census geometry is a versioned reference, not an hourly data feed.
+        if filename.endswith('.zip') and (SNAP / filename).exists():
+            continue
+        for attempt in range(3):
+            try:
+                request = urllib.request.Request(url, headers={'User-Agent': 'QuietCuts/1.0 (public WARN research)'})
+                data = urllib.request.urlopen(request, timeout=60).read()
+                if not data: raise ValueError(f'Empty source: {filename}')
+                break
+            except Exception:
+                if attempt == 2: raise
+                time.sleep(2 ** attempt)
         (SNAP / filename).write_bytes(data)
 
 def clean(s):
@@ -83,6 +94,15 @@ events=[]
 ns={'m':'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
 z=zipfile.ZipFile(SNAP/'ca.xlsx')
 ss=[''.join(t.itertext()) for t in ET.fromstring(z.read('xl/sharedStrings.xml')).findall('m:si',ns)]
+sheet_rows = ET.fromstring(z.read('xl/worksheets/sheet3.xml')).findall('.//m:row',ns)
+headers = {}
+for cell in sheet_rows[1].findall('m:c', ns):
+    value = cell.find('m:v', ns)
+    if value is not None:
+        headers[re.sub(r'\d', '', cell.get('r'))] = clean(ss[int(value.text)] if cell.get('t') == 's' else value.text)
+expected_headers = {'A':'County/Parish','B':'Notice Date','C':'Processed Date','D':'Effective Date','E':'Company','F':'Layoff/ Closure','G':'No. Of Employees','H':'Address','I':'Related Industry'}
+if headers != expected_headers:
+    raise ValueError('California worksheet schema changed; review before publication')
 for row in ET.fromstring(z.read('xl/worksheets/sheet3.xml')).findall('.//m:row',ns)[2:]:
     c={}
     for cell in row.findall('m:c',ns):
@@ -138,6 +158,8 @@ metadata=dict(retrievedDate=retrieved_date,title='Official WARN source snapshot'
                        'Source windows differ. State totals are sample totals and cannot support rankings of state layoff prevalence.',
                        'Illustrative news latency examples, if shown by the interface, must be kept separate from these official records.'],
               snapshots=manifest)
+if '--refresh' in sys.argv:
+    metadata['retrievedAt'] = datetime.now(timezone.utc).isoformat()
 (DATA/'events.json').write_text(json.dumps(dict(metadata=metadata,events=events),indent=2,ensure_ascii=False),encoding='utf8')
 sources=[
     dict(id='ca',title='California EDD · WARN reports',url='https://edd.ca.gov/warn',downloadUrl=SOURCES['ca.xlsx'],type='Official records',note='Current fiscal report; notice and processed dates are not first public posting dates.'),

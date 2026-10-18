@@ -1,0 +1,4 @@
+/data/*
+  Cache-Control: public, max-age=0, must-revalidate
+/deployment.json
+  Cache-Control: no-cache

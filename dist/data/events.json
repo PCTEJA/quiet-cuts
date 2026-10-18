@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "retrievedDate": "2026-10-17",
+    "retrievedDate": "2026-10-18",
     "title": "Official WARN source snapshot",
     "counts": {
       "CA": 368,
@@ -28,7 +28,7 @@
       {
         "filename": "wa-db.txt",
         "url": "https://fortress.wa.gov/esd/file/WARN",
-        "sha256": "10f83c671c63aee240ede2e62461b659773ceb9e2a77f80ecc68a08db9d086d8"
+        "sha256": "f7d0db6499e864758f58f25368355679564ef40ac5a238d0be2b5526316a183a"
       },
       {
         "filename": "ny-csv.txt",
@@ -45,7 +45,9 @@
         "url": "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2026_Gazetteer/2026_Gaz_counties_national.zip",
         "sha256": "6a99ca00efbc0be5112e225d4102704c51d5ce3b16e3afd6e4159460595fd12a"
       }
-    ]
+    ],
+    "retrievedAt": "2026-10-18T00:20:17.311509+00:00",
+    "collectionFingerprint": "6cb0da4af8bcab82adfb0e052d42fc6c7fff3d04cc746d7564930faa1e9ce02a"
   },
   "events": [
     {
